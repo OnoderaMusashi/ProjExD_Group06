@@ -11,11 +11,6 @@ HEIGHT = 700
 DECELERATION_RATE = 0.96  # 減速率
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-class Bullet:
-    """
-    拡張機能
-    """
-
 
 class GameManager:
     """
