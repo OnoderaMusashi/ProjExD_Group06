@@ -11,8 +11,6 @@ HEIGHT = 700
 DECELERATION_RATE = 0.96  # 減速率
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-
-
 class ReflectiveDiffuserBullet(pg.sprite.Sprite):
     """
     友情コンボ　反射拡散弾を描画する
@@ -216,7 +214,6 @@ class Bird(pg.sprite.Sprite):
         self.bump_combo = True  # 初期状態でbump_comboをTrueに設定
 
 
-    
     def update(self, v):
         self.rect.move_ip(self.dx*v[0]*self.speed, self.dy*v[1]*self.speed)  # キャラクター位置を更新
         if 30 > self.rect.centerx:  # 左壁判定
@@ -366,7 +363,7 @@ def main():
 
 
 if __name__ == "__main__":
-    pg.init()
+    pg.init()#仮#
     main()
     pg.quit()
     sys.exit()
