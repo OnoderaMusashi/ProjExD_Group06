@@ -68,8 +68,8 @@ class ReflectiveDiffuserBullet(pg.sprite.Sprite):
             self.life -= 1
         if self.life < 0:  # 3回反射したら
             self.kill()
-
-
+    
+    
 class GameManager:
     """
     ゲームの進行を管理するクラス
@@ -156,7 +156,7 @@ class GameManager:
         self.img.blit(self.txt3, self.t3_rct)
         self.img.blit(self.txt4, self.t4_rct)
         screen.blit(self.img, (0, 525))
-    
+        
     def end_process(self):
         """
         キャラクターが止まった時に行う処理
@@ -170,6 +170,8 @@ class GameManager:
         self.characters[self.turn%4].dy = 1
         self.turn += 1
         self.state = "wait"
+        for c in self.characters:
+            c.bump_combo = True  # 友情コンボを発動可にする
 
     def now_character(self, num=None):
         """
@@ -211,7 +213,8 @@ class Bird(pg.sprite.Sprite):
         self.x, self.y = random.randint(95+100*num, 105+100*num), random.randint(450, 490)
         self.rect.center = (self.x, self.y)  # キャラクターの位置を設定
         self.dx, self.dy = 1, 1  # 反転するかの変数を初期化
-        self.bump_combo = True  # 初期状態でbump_comboをTrueに設定
+        self.bump_combo = True  # 友情コンボがこのターンで発動されたかを保存する
+
 
 
     def update(self, v):
@@ -228,6 +231,8 @@ class Bird(pg.sprite.Sprite):
         if HEIGHT-175-30 < self.rect.centery:  # 下壁判定
             self.rect.centery = HEIGHT-175-30
             self.dy *= -1
+        
+        
 
 
 class Arrow:
