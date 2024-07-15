@@ -34,7 +34,7 @@ class GameManager:
         self.speed = 0
         self.hp = 10000
         self.maxhp = 10000
-    
+
     def create(self):
         """
         キャラクターを生成するメソッド
@@ -58,7 +58,7 @@ class GameManager:
         self.vec = v  # 単位化したベクトルを設定
         self.speed = self.characters[self.turn%4].speed  # 動き出す前にスピードを保存する
         self.characters[self.turn%4].dx, self.characters[self.turn%4].dy = 1, 1  # ベクトルを反転させるかを決める変数
-    
+                    
     def update(self, screen, tmr: int):
         if self.state == "move":
             self.characters[self.turn%4].update(self.vec)
@@ -98,7 +98,7 @@ class GameManager:
         self.img.blit(self.txt3, self.t3_rct)
         self.img.blit(self.txt4, self.t4_rct)
         screen.blit(self.img, (0, 525))
-    
+      
     def end_process(self):
         """
         キャラクターが止まった時に行う処理
@@ -112,6 +112,8 @@ class GameManager:
         self.characters[self.turn%4].dy = 1
         self.turn += 1
         self.state = "wait"
+        for c in self.characters:
+            c.bump_combo = True  # 友情コンボを発動可にする
 
     def now_character(self, num=None):
         """
@@ -153,6 +155,7 @@ class Bird(pg.sprite.Sprite):
         self.x, self.y = random.randint(95+100*num, 105+100*num), random.randint(450, 490)
         self.rect.center = (self.x, self.y)  # キャラクターの位置を設定
         self.dx, self.dy = 1, 1  # 反転するかの変数を初期化
+        self.bump_combo = True  # 友情コンボがこのターンで発動されたかを保存する
     
     def update(self, v):
         self.rect.move_ip(self.dx*v[0]*self.speed, self.dy*v[1]*self.speed)  # キャラクター位置を更新
@@ -229,6 +232,38 @@ class Arrow:
         self.uy = self.vy/self.l  # Y成分を単位化
         # print("ux:"+str(self.ux)+", uy:"+str(self.uy))
         return self.ux, self.uy  # 単位化したベクトルを返す
+    
+
+class HighEnergyCircle(pg.sprite.Sprite):
+    """
+    エナジーサークルを管理するクラス
+    """
+    def __init__(self, pos):
+        """
+        初期化メソッド
+        引数 pos:サークルの中心
+        """
+        super().__init__()
+        self.image = pg.Surface((WIDTH, HEIGHT))
+        self.rect = self.image.get_rect()
+        self.image.set_colorkey((0, 0, 0))  # 黒色を透明化
+        self.image.set_alpha(200)  # 透明度設定
+        self.rect.center = WIDTH/2, HEIGHT/2
+        self.center = pos
+        self.attack = 100000  # 友情コンボのダメージ量
+        self.r = 30  # 発動直後の半径
+        self.t = 10  # 発動直後のエナジーサークルの幅
+        self.time = 0  # 発動してからの経過時間
+
+    def update(self):
+        self.time += 1
+        if self.time >= 50:
+            self.r += 30
+            self.t += 3
+        if self.time >= WIDTH+ HEIGHT:
+            self.kill()
+        pg.draw.circle(self.image, (255, 0, 255), self.center, self.r+self.t)
+        pg.draw.circle(self.image, (0, 0, 0), self.center, self.r)
 
 
 def main():
@@ -237,9 +272,10 @@ def main():
     bg_img = pg.image.load(f"fig/pg_bg.jpg")
     game = GameManager()  # ゲームを初期化する
     birds = game.create()  # こうかとんグループを生成
+    high_energy_circles = pg.sprite.Group()
 
     tmr = 0
-    clock = pg.time.Clock()
+    clock = pg.time.Clock()    
     while True:
         key_lst = pg.key.get_pressed()  # 押されたkey
         mouse_pos = pg.mouse.get_pos()  # マウスの座標
@@ -279,6 +315,16 @@ def main():
 
         # 画面処理
         screen.blit(bg_img,[0,0])  # 背景を描画する
+
+        if game.state == "move":  # 手番のキャラクターが動いているとき(敵にダメージが与えられる時)
+            #  手番のキャラクターと3のキャラクターとの衝突判定
+            if game.now_character().rect.colliderect(game.now_character(3).rect) and game.now_character(3).bump_combo:
+                if game.turn%4 != 3:
+                    high_energy_circles.add(HighEnergyCircle(game.now_character(3).rect.center))
+                    game.now_character(3).bump_combo = False
+            high_energy_circles.update()
+            high_energy_circles.draw(screen)
+
 
         game.update(screen, tmr)  # ゲーム進行を更新する
         if game.state == "drag":  # 矢印を引っ張ている間
