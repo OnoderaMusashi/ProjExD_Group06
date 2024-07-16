@@ -98,7 +98,7 @@ class GameManager:
         self.img.blit(self.txt3, self.t3_rct)
         self.img.blit(self.txt4, self.t4_rct)
         screen.blit(self.img, (0, 525))
-    
+
     def end_process(self):
         """
         キャラクターが止まった時に行う処理
@@ -112,6 +112,8 @@ class GameManager:
         self.characters[self.turn%4].dy = 1
         self.turn += 1
         self.state = "wait"
+        for c in self.characters:
+            c.bump_combo = True  # 友情コンボを発動可にする
 
     def now_character(self, num=None):
         """
@@ -149,10 +151,12 @@ class Bird(pg.sprite.Sprite):
         self.attack = character_dic[num][1]  # 攻撃力を設定
         self.hp = character_dic[num][2]  # HPを設定
         self.rect = self.image.get_rect()  # rectを取得
+        # self.bump_combo = False #bomp_combo属性を追加
         # キャラクターの初期位置をランダムに設定
         self.x, self.y = random.randint(95+100*num, 105+100*num), random.randint(450, 490)
         self.rect.center = (self.x, self.y)  # キャラクターの位置を設定
         self.dx, self.dy = 1, 1  # 反転するかの変数を初期化
+        self.bump_combo = True  # 友情コンボがこのターンで発動されたかを保存する
     
     def update(self, v):
         self.rect.move_ip(self.dx*v[0]*self.speed, self.dy*v[1]*self.speed)  # キャラクター位置を更新
@@ -231,13 +235,43 @@ class Arrow:
         return self.ux, self.uy  # 単位化したベクトルを返す
 
 
+class CrossLaser(pg.sprite.Sprite):
+    """
+    友情コンボ　十字レーザーを描画する
+    """
+    def __init__(self, r: int, pos: tuple[int, int]) -> None:
+        """
+        イニシャライザー
+        引数1 r：回転角度
+        引数2 pos：キャラクターの座標タプル
+        戻り値：なし
+        """
+        super().__init__()
+        self.image = pg.Surface((HEIGHT*2, 60))  # Surfaceの作成
+        self.image.fill((0, 255, 255))  # レーザーの色を青にする
+        pg.draw.rect(self.image, (255, 255, 255), (0, 13, HEIGHT*2, 34))
+        self.image = pg.transform.rotate(self.image, r)  # 回転角の分だけSurfaceごと回転する
+        self.image.set_alpha(200)  # 透明度を設定
+        self.rect = self.image.get_rect()
+        self.rect.center = pos  # 発動位置をキャラクターの座標に設定
+        self.attack = 1000  # 友情コンボのダメージ量
+        self.life = 100  # 発動時間
+
+    def update(self):
+        """
+        発動時間を更新し、発動時間が0になったらkillする
+        """
+        self.life -= 1
+        if self.life <= 0:
+            self.kill()
+
 def main():
     pg.display.set_caption("こうかとんストライク")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load(f"fig/pg_bg.jpg")
     game = GameManager()  # ゲームを初期化する
     birds = game.create()  # こうかとんグループを生成
-
+    cross_lasers = pg.sprite.Group()
     tmr = 0
     clock = pg.time.Clock()
     while True:
@@ -279,6 +313,17 @@ def main():
 
         # 画面処理
         screen.blit(bg_img,[0,0])  # 背景を描画する
+
+        if game.state == "move":  # 手番のキャラクターが動いているとき(敵にダメージを与えられるとき)
+            # 手番のキャラクターと1のキャラクターとの衝突判定
+            if game.now_character().rect.colliderect(game.now_character(1).rect) and game.now_character(1).bump_combo:
+                if game.turn%4 != 1:
+                    for r in range(0, 91, 90):
+                        # print(r)
+                        cross_lasers.add(CrossLaser(r, game.now_character(1).rect.center))
+                        game.now_character(1).bump_combo = False
+        cross_lasers.update()
+        cross_lasers.draw(screen)
 
         game.update(screen, tmr)  # ゲーム進行を更新する
         if game.state == "drag":  # 矢印を引っ張ている間
