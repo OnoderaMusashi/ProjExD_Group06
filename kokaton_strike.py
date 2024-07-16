@@ -112,6 +112,8 @@ class GameManager:
         self.characters[self.turn%4].dy = 1
         self.turn += 1
         self.state = "wait"
+        for c in self.characters:
+            c.bump_combo = True #友情コンボ一回発動
 
     def now_character(self, num=None):
         """
@@ -153,6 +155,7 @@ class Bird(pg.sprite.Sprite):
         self.x, self.y = random.randint(95+100*num, 105+100*num), random.randint(450, 490)
         self.rect.center = (self.x, self.y)  # キャラクターの位置を設定
         self.dx, self.dy = 1, 1  # 反転するかの変数を初期化
+        self.bump_combo = True #友情コンボがこのターンで発動されたかを保存する
     
     def update(self, v):
         self.rect.move_ip(self.dx*v[0]*self.speed, self.dy*v[1]*self.speed)  # キャラクター位置を更新
@@ -230,6 +233,49 @@ class Arrow:
         # print("ux:"+str(self.ux)+", uy:"+str(self.uy))
         return self.ux, self.uy  # 単位化したベクトルを返す
 
+class EnergyCircleFive(pg.sprite.Sprite):
+    """
+    全属性エナジーサークルクラス
+    """
+    def __init__(self, r: int, pos: tuple[int, int],color: tuple[int, int,int]) -> None:
+        """
+        イニシャライザー
+        引数1 r:回転角度
+        引数2 pos:キャラクターの座標タプル
+        引数3 color: 色タプル
+        戻り値:なし
+        """
+        super().__init__()
+        l = 120
+        self.image = pg.Surface((l, l))  # Surface作成
+        pg.draw.circle(self.image, color, (l/2, l/2), l/2)
+        pg.draw.circle(self.image, (0, 0, 0), (l/2, l/2), l/2-20)
+        self.image.set_alpha(200)  # 透明度を設定
+        self.image.set_colorkey((0, 0, 0))
+        self.rect = self.image.get_rect()
+        self.rect.center = rotate_pos(pos, l-40, r)  # 発動位置をキャラクターの座標に設定
+        self.attack = 1000  # 友情コンボの火力
+        self.life = 100  # 発動時間
+
+    def update(self):
+        """
+        発動時間を更新し、発動時間が0になったらkillする
+        """
+        self.life -= 1
+        if self.life <= 0:
+            self.kill()
+
+
+def rotate_pos(center: tuple[int, int], l: int, r: int) -> tuple[int,int]:
+    """
+    与えられた座標を中心に反時計回りにr°開店した座標を表す
+    引数1 center: 原点
+    引数2 l: 半径
+    引数3 r: 回転角度
+    戻り値: 回転後の座標タプル
+    """
+    return l*math.cos(math.radians(r))+center[0], l*math.sin(math.radians(r))+center[1]
+
 
 def main():
     pg.display.set_caption("こうかとんストライク")
@@ -237,6 +283,13 @@ def main():
     bg_img = pg.image.load(f"fig/pg_bg.jpg")
     game = GameManager()  # ゲームを初期化する
     birds = game.create()  # こうかとんグループを生成
+
+    energy_circle_fives = pg.sprite.Group()
+    colors = [(255, 255, 0),  # 黄色
+              (255, 0, 255),  # 紫色
+              (255, 0, 0),    # 赤色
+              (0, 255, 255),  # 青色
+              (127, 255, 0)]  # 緑色
 
     tmr = 0
     clock = pg.time.Clock()
@@ -279,6 +332,17 @@ def main():
 
         # 画面処理
         screen.blit(bg_img,[0,0])  # 背景を描画する
+
+        if game.state == "move":  # 手版のキャラクターが動いているとき（敵にダメージを与えられるとき）
+            # 手版のキャラクターと0のキャラクターとの衝突判定
+            if game.now_character().rect.colliderect(game.now_character(0).rect) and game.now_character(0).bump_combo:
+                if game.turn%4 != 0:
+                    for r, color in zip(range(-90, 261, 72), colors):
+                        print(r, color)
+                        energy_circle_fives.add(EnergyCircleFive(r, game.now_character(0).rect.center, color))
+                        game.now_character(0).bump_combo = False
+        energy_circle_fives.update()
+        energy_circle_fives.draw(screen)
 
         game.update(screen, tmr)  # ゲーム進行を更新する
         if game.state == "drag":  # 矢印を引っ張ている間
