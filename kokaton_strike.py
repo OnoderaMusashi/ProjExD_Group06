@@ -348,6 +348,39 @@ class Enemy(pg.sprite.Sprite):
             self.interval = 3  # 攻撃間隔を初期化
 
 
+class EnergyCircleFive(pg.sprite.Sprite):
+    """
+    全属性エナジーサークルクラス
+    """
+    def __init__(self, r: int, pos: tuple[int, int],color: tuple[int, int,int]) -> None:
+        """
+        イニシャライザー
+        引数1 r:回転角度
+        引数2 pos:キャラクターの座標タプル
+        引数3 color: 色タプル
+        戻り値:なし
+        """
+        super().__init__()
+        l = 120
+        self.image = pg.Surface((l, l))  # Surface作成
+        pg.draw.circle(self.image, color, (l/2, l/2), l/2)
+        pg.draw.circle(self.image, (0, 0, 0), (l/2, l/2), l/2-20)
+        self.image.set_alpha(200)  # 透明度を設定
+        self.image.set_colorkey((0, 0, 0))
+        self.rect = self.image.get_rect()
+        self.rect.center = rotate_pos(pos, l-40, r)  # 発動位置をキャラクターの座標に設定
+        self.attack = 1000  # 友情コンボの火力
+        self.life = 100  # 発動時間
+
+    def update(self):
+        """
+        発動時間を更新し、発動時間が0になったらkillする
+        """
+        self.life -= 1
+        if self.life <= 0:
+            self.kill()
+
+
 def main():
     pg.display.set_caption("こうかとんストライク")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
@@ -374,6 +407,13 @@ def main():
     txt_rct = txt.get_rect()
     txt_rct.center = WIDTH/2, HEIGHT/2  # 文字の中心を画面中央に設定
     clear_img.blit(txt, txt_rct)  # ゲームクリア画面に描画
+
+    energy_circle_fives = pg.sprite.Group()
+    colors = [(255, 255, 0),  # 黄色
+              (255, 0, 255),  # 紫色
+              (255, 0, 0),    # 赤色
+              (0, 255, 255),  # 青色
+              (127, 255, 0)]  # 緑色
 
     tmr = 0
     clock = pg.time.Clock()
@@ -426,6 +466,17 @@ def main():
 
         enemys.draw(screen)  # 敵を描画
         enemys.update(screen)  # 敵の状態を更新(弱点描画)
+
+        if game.state == "move":  # 手版のキャラクターが動いているとき（敵にダメージを与えられるとき）
+            # 手版のキャラクターと0のキャラクターとの衝突判定
+            if game.now_character().rect.colliderect(game.now_character(0).rect) and game.now_character(0).bump_combo:
+                if game.turn%4 != 0:
+                    for r, color in zip(range(-90, 261, 72), colors):
+                        print(r, color)
+                        energy_circle_fives.add(EnergyCircleFive(r, game.now_character(0).rect.center, color))
+                        game.now_character(0).bump_combo = False
+        energy_circle_fives.update()
+        energy_circle_fives.draw(screen)
 
         game.update(screen, tmr)  # ゲーム進行を更新する
         if game.state == "drag":  # 矢印を引っ張ている間
