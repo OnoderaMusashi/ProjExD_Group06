@@ -11,64 +11,6 @@ HEIGHT = 700
 DECELERATION_RATE = 0.96  # 減速率
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-class ReflectiveDiffuserBullet(pg.sprite.Sprite):
-    """
-    友情コンボ　反射拡散弾を描画する
-    """
-    def __init__(self, pos: tuple[int, int]) -> None:
-        """
-        イニシャライザー
-        引数 pos：キャラクターの座標タプル
-        戻り値：なし
-        """
-        super().__init__()
-        img = pg.transform.rotozoom(pg.image.load(f"fig/beam.png"), 0, 2.0)
-        img0 = pg.transform.flip(img, True, False)  # デフォルトのこうかとん
-        self.imgs = {
-            (1, 0): img,  # 右
-            (1, -1): pg.transform.rotozoom(img, 45, 1.0),  # 右上
-            (0, -1): pg.transform.rotozoom(img, 90, 1.0),  # 上
-            (-1, -1): pg.transform.rotozoom(img0, -45, 1.0),  # 左上
-            (-1, 0): img0,  # 左
-            (-1, 1): pg.transform.rotozoom(img0, 45, 1.0),  # 左下
-            (0, 1): pg.transform.rotozoom(img, -90, 1.0),  # 下
-            (1, 1): pg.transform.rotozoom(img, -45, 1.0),  # 右下
-        }
-        self.image = img0
-        self.dire = [0, 0]
-        while self.dire == [0, 0]:
-            self.dire = [random.randint(-1, 1), random.randint(-1, 1)]
-        self.d = 5
-        self.rect = self.image.get_rect()
-        self.rect.center = pos
-        self.attack = 1000  # 友情コンボのダメージ量
-        self.life = 3  # 発動時間
-
-    def update(self):
-        """
-        拡散弾の位置を更新、壁と衝突したら反転、3回反射したらkillする
-        """
-        self.image = self.imgs[tuple(self.dire)]  # 方向によって画像を切り替える
-        self.rect.move_ip(self.dire[0]*self.d, self.dire[1]*self.d)  # キャラクター位置を更新
-        if 30 > self.rect.centerx:  # 左壁判定
-            self.rect.centerx = 30  # キャラクターを壁の中に戻す
-            self.dire[0] *= -1  # ベクトルを反転させる
-            self.life -= 1
-        if WIDTH-30 < self.rect.centerx:  # 右壁判定
-            self.rect.centerx = WIDTH-30
-            self.dire[0] *= -1 
-            self.life -= 1
-        if 30 > self.rect.centery:  # 上壁判定
-            self.rect.centery = 30
-            self.dire[1] *= -1 
-            self.life -= 1
-        if HEIGHT-175-30 < self.rect.centery:  # 下壁判定
-            self.rect.centery = HEIGHT-175-30
-            self.dire[1] *= -1
-            self.life -= 1
-        if self.life < 0:  # 3回反射したら
-            self.kill()
-    
     
 class GameManager:
     """
@@ -231,8 +173,6 @@ class Bird(pg.sprite.Sprite):
             self.rect.centery = HEIGHT-175-30
             self.dy *= -1
         
-        
-
 
 class Arrow:
     """
@@ -293,7 +233,65 @@ class Arrow:
         self.uy = self.vy/self.l  # Y成分を単位化
         # print("ux:"+str(self.ux)+", uy:"+str(self.uy))
         return self.ux, self.uy  # 単位化したベクトルを返す
+    
+class ReflectiveDiffuserBullet(pg.sprite.Sprite):
+    """
+    友情コンボ　反射拡散弾を描画する
+    """
+    def __init__(self, pos: tuple[int, int]) -> None:
+        """
+        イニシャライザー
+        引数 pos:キャラクターの座標タプル
+        戻り値：なし
+        """
+        super().__init__()
+        img = pg.transform.rotozoom(pg.image.load(f"fig/beam.png"), 0, 2.0)
+        img0 = pg.transform.flip(img, True, False)  # デフォルトのこうかとん
+        self.imgs = {
+            (1, 0): img,  # 右
+            (1, -1): pg.transform.rotozoom(img, 45, 1.0),  # 右上
+            (0, -1): pg.transform.rotozoom(img, 90, 1.0),  # 上
+            (-1, -1): pg.transform.rotozoom(img0, -45, 1.0),  # 左上
+            (-1, 0): img0,  # 左
+            (-1, 1): pg.transform.rotozoom(img0, 45, 1.0),  # 左下
+            (0, 1): pg.transform.rotozoom(img, -90, 1.0),  # 下
+            (1, 1): pg.transform.rotozoom(img, -45, 1.0),  # 右下
+        }
+        self.image = img0
+        self.dire = [0, 0]
+        while self.dire == [0, 0]:
+            self.dire = [random.randint(-1, 1), random.randint(-1, 1)]
+        self.d = 5
+        self.rect = self.image.get_rect()
+        self.rect.center = pos
+        self.attack = 1000  # 友情コンボのダメージ量
+        self.life = 3  # 発動時間
 
+    def update(self):
+        """
+        拡散弾の位置を更新、壁と衝突したら反転、3回反射したらkillする
+        """
+        self.image = self.imgs[tuple(self.dire)]  # 方向によって画像を切り替える
+        self.rect.move_ip(self.dire[0]*self.d, self.dire[1]*self.d)  # キャラクター位置を更新
+        if 30 > self.rect.centerx:  # 左壁判定
+            self.rect.centerx = 30  # キャラクターを壁の中に戻す
+            self.dire[0] *= -1  # ベクトルを反転させる
+            self.life -= 1
+        if WIDTH-30 < self.rect.centerx:  # 右壁判定
+            self.rect.centerx = WIDTH-30
+            self.dire[0] *= -1 
+            self.life -= 1
+        if 30 > self.rect.centery:  # 上壁判定
+            self.rect.centery = 30
+            self.dire[1] *= -1 
+            self.life -= 1
+        if HEIGHT-175-30 < self.rect.centery:  # 下壁判定
+            self.rect.centery = HEIGHT-175-30
+            self.dire[1] *= -1
+            self.life -= 1
+        if self.life < 0:  # 3回反射したら
+            self.kill()
+    
 
 def main():
     pg.display.set_caption("こうかとんストライク")
