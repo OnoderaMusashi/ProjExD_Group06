@@ -216,7 +216,6 @@ class Bird(pg.sprite.Sprite):
         self.bump_combo = True  # 友情コンボがこのターンで発動されたかを保存する
 
 
-
     def update(self, v):
         self.rect.move_ip(self.dx*v[0]*self.speed, self.dy*v[1]*self.speed)  # キャラクター位置を更新
         if 30 > self.rect.centerx:  # 左壁判定
