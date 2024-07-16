@@ -35,7 +35,7 @@ class GameManager:
         self.speed = 0
         self.hp = 10000
         self.maxhp = 10000
-    
+
     def create(self):
         """
         キャラクターを生成するメソッド
@@ -59,7 +59,7 @@ class GameManager:
         self.vec = v  # 単位化したベクトルを設定
         self.speed = self.characters[self.turn%4].speed  # 動き出す前にスピードを保存する
         self.characters[self.turn%4].dx, self.characters[self.turn%4].dy = 1, 1  # ベクトルを反転させるかを決める変数
-    
+                    
     def update(self, screen, tmr: int):
         if self.state == "move":
             self.characters[self.turn%4].update(self.vec)
@@ -99,7 +99,7 @@ class GameManager:
         self.img.blit(self.txt3, self.t3_rct)
         self.img.blit(self.txt4, self.t4_rct)
         screen.blit(self.img, (0, 525))
-    
+
     def end_process(self):
         """
         キャラクターが止まった時に行う処理
@@ -152,6 +152,7 @@ class Bird(pg.sprite.Sprite):
         self.attack = character_dic[num][1]  # 攻撃力を設定
         self.hp = character_dic[num][2]  # HPを設定
         self.rect = self.image.get_rect()  # rectを取得
+        # self.bump_combo = False #bomp_combo属性を追加
         # キャラクターの初期位置をランダムに設定
         self.x, self.y = random.randint(95+100*num, 105+100*num), random.randint(450, 490)
         self.rect.center = (self.x, self.y)  # キャラクターの位置を設定
@@ -349,12 +350,116 @@ class Enemy(pg.sprite.Sprite):
             self.interval = 3  # 攻撃間隔を初期化
 
 
+class EnergyCircleFive(pg.sprite.Sprite):
+    """
+    全属性エナジーサークルクラス
+    """
+    def __init__(self, r: int, pos: tuple[int, int],color: tuple[int, int,int]) -> None:
+        """
+        イニシャライザー
+        引数1 r:回転角度
+        引数2 pos:キャラクターの座標タプル
+        引数3 color: 色タプル
+        戻り値:なし
+        """
+        super().__init__()
+        l = 120
+        self.image = pg.Surface((l, l))  # Surface作成
+        pg.draw.circle(self.image, color, (l/2, l/2), l/2)
+        pg.draw.circle(self.image, (0, 0, 0), (l/2, l/2), l/2-20)
+        self.image.set_alpha(200)  # 透明度を設定
+        self.image.set_colorkey((0, 0, 0))
+        self.rect = self.image.get_rect()
+        self.rect.center = rotate_pos(pos, l-40, r)  # 発動位置をキャラクターの座標に設定
+        self.attack = 1000  # 友情コンボの火力
+        self.life = 100  # 発動時間
+
+    def update(self):
+        """
+        発動時間を更新し、発動時間が0になったらkillする
+        """
+        self.life -= 1
+        if self.life <= 0:
+            self.kill()
+
+
+class HighEnergyCircle(pg.sprite.Sprite):
+    """
+    エナジーサークルを管理するクラス
+    """
+    def __init__(self, pos):
+        """
+        初期化メソッド
+        引数 pos:サークルの中心
+        """
+        super().__init__()
+        self.image = pg.Surface((WIDTH, HEIGHT))
+        self.rect = self.image.get_rect()
+        self.image.set_colorkey((0, 0, 0))  # 黒色を透明化
+        self.image.set_alpha(200)  # 透明度設定
+        self.rect.center = WIDTH/2, HEIGHT/2
+        self.center = pos
+        self.attack = 100000  # 友情コンボのダメージ量
+        self.r = 30  # 発動直後の半径
+        self.t = 10  # 発動直後のエナジーサークルの幅
+        self.time = 0  # 発動してからの経過時間
+
+    def update(self):
+        self.time += 1
+        if self.time >= 50:
+            self.r += 30
+            self.t += 3
+        if self.time >= WIDTH+ HEIGHT:
+            self.kill()
+        pg.draw.circle(self.image, (255, 0, 255), self.center, self.r+self.t)
+        pg.draw.circle(self.image, (0, 0, 0), self.center, self.r)
+
+
+class CrossLaser(pg.sprite.Sprite):
+    """
+    友情コンボ　十字レーザーを描画する
+    """
+    def __init__(self, r: int, pos: tuple[int, int]) -> None:
+        """
+        イニシャライザー
+        引数1 r：回転角度
+        引数2 pos：キャラクターの座標タプル
+        戻り値：なし
+        """
+        super().__init__()
+        self.image = pg.Surface((HEIGHT*2, 60))  # Surfaceの作成
+        self.image.fill((0, 255, 255))  # レーザーの色を青にする
+        pg.draw.rect(self.image, (255, 255, 255), (0, 13, HEIGHT*2, 34))
+        self.image = pg.transform.rotate(self.image, r)  # 回転角の分だけSurfaceごと回転する
+        self.image.set_alpha(200)  # 透明度を設定
+        self.rect = self.image.get_rect()
+        self.rect.center = pos  # 発動位置をキャラクターの座標に設定
+        self.attack = 1000  # 友情コンボのダメージ量
+        self.life = 100  # 発動時間
+
+    def update(self):
+        """
+        発動時間を更新し、発動時間が0になったらkillする
+        """
+        self.life -= 1
+        if self.life <= 0:
+            self.kill()
+
+
 def main():
     pg.display.set_caption("こうかとんストライク")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load(f"fig/pg_bg.jpg")
     game = GameManager()  # ゲームを初期化する
     birds = game.create()  # こうかとんグループを生成
+    high_energy_circles = pg.sprite.Group()  # ハイエナジーサークルのグループ
+    energy_circle_fives = pg.sprite.Group()  # 全属性エナジーサークルのグループ
+    colors = [(255, 255, 0),  # 黄色
+              (255, 0, 255),  # 紫色
+              (255, 0, 0),    # 赤色
+              (0, 255, 255),  # 青色
+              (127, 255, 0)]  # 緑色
+    cross_lasers = pg.sprite.Group()  # 十字レーザーのグループ
 
     # 味方関係
     turn_character = pg.Surface((80, 80))
@@ -377,7 +482,7 @@ def main():
     clear_img.blit(txt, txt_rct)  # ゲームクリア画面に描画
 
     tmr = 0
-    clock = pg.time.Clock()
+    clock = pg.time.Clock()    
     while True:
         key_lst = pg.key.get_pressed()  # 押されたkey
         mouse_pos = pg.mouse.get_pos()  # マウスの座標
@@ -427,6 +532,34 @@ def main():
 
         enemys.draw(screen)  # 敵を描画
         enemys.update(screen)  # 敵の状態を更新(弱点描画)
+
+        if game.state == "move":  # 手版のキャラクターが動いているとき（敵にダメージを与えられるとき）
+            # 手版のキャラクターと0のキャラクターとの衝突判定
+            if game.now_character().rect.colliderect(game.now_character(0).rect) and game.now_character(0).bump_combo:
+                if game.turn%4 != 0:
+                    for r, color in zip(range(-90, 261, 72), colors):
+                        print(r, color)
+                        energy_circle_fives.add(EnergyCircleFive(r, game.now_character(0).rect.center, color))
+                        game.now_character(0).bump_combo = False
+            # 手番のキャラクターと1のキャラクターとの衝突判定
+            if game.now_character().rect.colliderect(game.now_character(1).rect) and game.now_character(1).bump_combo:
+                if game.turn%4 != 1:
+                    for r in range(0, 91, 90):
+                        # print(r)
+                        cross_lasers.add(CrossLaser(r, game.now_character(1).rect.center))
+                        game.now_character(1).bump_combo = False
+            #  手番のキャラクターと3のキャラクターとの衝突判定
+            if game.now_character().rect.colliderect(game.now_character(3).rect) and game.now_character(3).bump_combo:
+                if game.turn%4 != 3:
+                    high_energy_circles.add(HighEnergyCircle(game.now_character(3).rect.center))
+                    game.now_character(3).bump_combo = False
+        
+        energy_circle_fives.update()
+        energy_circle_fives.draw(screen)
+        cross_lasers.update()
+        cross_lasers.draw(screen)
+        high_energy_circles.update()
+        high_energy_circles.draw(screen)
 
         game.update(screen, tmr)  # ゲーム進行を更新する
         if game.state == "drag":  # 矢印を引っ張ている間
