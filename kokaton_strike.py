@@ -365,7 +365,7 @@ def main():
 
 
 if __name__ == "__main__":
-    pg.init()#仮#
+    pg.init()
     main()
     pg.quit()
     sys.exit()
