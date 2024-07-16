@@ -232,38 +232,6 @@ class Arrow:
         self.uy = self.vy/self.l  # Y成分を単位化
         # print("ux:"+str(self.ux)+", uy:"+str(self.uy))
         return self.ux, self.uy  # 単位化したベクトルを返す
-    
-
-class HighEnergyCircle(pg.sprite.Sprite):
-    """
-    エナジーサークルを管理するクラス
-    """
-    def __init__(self, pos):
-        """
-        初期化メソッド
-        引数 pos:サークルの中心
-        """
-        super().__init__()
-        self.image = pg.Surface((WIDTH, HEIGHT))
-        self.rect = self.image.get_rect()
-        self.image.set_colorkey((0, 0, 0))  # 黒色を透明化
-        self.image.set_alpha(200)  # 透明度設定
-        self.rect.center = WIDTH/2, HEIGHT/2
-        self.center = pos
-        self.attack = 100000  # 友情コンボのダメージ量
-        self.r = 30  # 発動直後の半径
-        self.t = 10  # 発動直後のエナジーサークルの幅
-        self.time = 0  # 発動してからの経過時間
-
-    def update(self):
-        self.time += 1
-        if self.time >= 50:
-            self.r += 30
-            self.t += 3
-        if self.time >= WIDTH+ HEIGHT:
-            self.kill()
-        pg.draw.circle(self.image, (255, 0, 255), self.center, self.r+self.t)
-        pg.draw.circle(self.image, (0, 0, 0), self.center, self.r)
 
 
 def rotate_pos(center: tuple[int, int], l: int, r: int) -> tuple[int, int]:
