@@ -11,7 +11,7 @@ HEIGHT = 700
 DECELERATION_RATE = 0.96  # 減速率
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-
+    
 class GameManager:
     """
     ゲームの進行を管理するクラス
@@ -99,7 +99,7 @@ class GameManager:
         self.img.blit(self.txt3, self.t3_rct)
         self.img.blit(self.txt4, self.t4_rct)
         screen.blit(self.img, (0, 525))
-
+    
     def end_process(self):
         """
         キャラクターが止まった時に行う処理
@@ -173,7 +173,7 @@ class Bird(pg.sprite.Sprite):
         if HEIGHT-175-30 < self.rect.centery:  # 下壁判定
             self.rect.centery = HEIGHT-175-30
             self.dy *= -1
-
+        
 
 class Arrow:
     """
@@ -446,6 +446,65 @@ class CrossLaser(pg.sprite.Sprite):
             self.kill()
 
 
+class ReflectiveDiffuserBullet(pg.sprite.Sprite):
+    """
+    友情コンボ　反射拡散弾を描画する
+    """
+    def __init__(self, pos: tuple[int, int]) -> None:
+        """
+        イニシャライザー
+        引数 pos:キャラクターの座標タプル
+        戻り値：なし
+        """
+        super().__init__()
+        img = pg.transform.rotozoom(pg.image.load(f"fig/beam.png"), 0, 2.0)
+        img0 = pg.transform.flip(img, True, False)  # デフォルトのこうかとん
+        self.imgs = {
+            (1, 0): img,  # 右
+            (1, -1): pg.transform.rotozoom(img, 45, 1.0),  # 右上
+            (0, -1): pg.transform.rotozoom(img, 90, 1.0),  # 上
+            (-1, -1): pg.transform.rotozoom(img0, -45, 1.0),  # 左上
+            (-1, 0): img0,  # 左
+            (-1, 1): pg.transform.rotozoom(img0, 45, 1.0),  # 左下
+            (0, 1): pg.transform.rotozoom(img, -90, 1.0),  # 下
+            (1, 1): pg.transform.rotozoom(img, -45, 1.0),  # 右下
+        }
+        self.image = img0
+        self.dire = [0, 0]
+        while self.dire == [0, 0]:
+            self.dire = [random.randint(-1, 1), random.randint(-1, 1)]
+        self.d = 5
+        self.rect = self.image.get_rect()
+        self.rect.center = pos
+        self.attack = 1000  # 友情コンボのダメージ量
+        self.life = 3  # 発動時間
+
+    def update(self):
+        """
+        拡散弾の位置を更新、壁と衝突したら反転、3回反射したらkillする
+        """
+        self.image = self.imgs[tuple(self.dire)]  # 方向によって画像を切り替える
+        self.rect.move_ip(self.dire[0]*self.d, self.dire[1]*self.d)  # キャラクター位置を更新
+        if 30 > self.rect.centerx:  # 左壁判定
+            self.rect.centerx = 30  # キャラクターを壁の中に戻す
+            self.dire[0] *= -1  # ベクトルを反転させる
+            self.life -= 1
+        if WIDTH-30 < self.rect.centerx:  # 右壁判定
+            self.rect.centerx = WIDTH-30
+            self.dire[0] *= -1 
+            self.life -= 1
+        if 30 > self.rect.centery:  # 上壁判定
+            self.rect.centery = 30
+            self.dire[1] *= -1 
+            self.life -= 1
+        if HEIGHT-175-30 < self.rect.centery:  # 下壁判定
+            self.rect.centery = HEIGHT-175-30
+            self.dire[1] *= -1
+            self.life -= 1
+        if self.life < 0:  # 3回反射したら
+            self.kill()
+
+
 def main():
     pg.display.set_caption("こうかとんストライク")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
@@ -460,6 +519,7 @@ def main():
               (0, 255, 255),  # 青色
               (127, 255, 0)]  # 緑色
     cross_lasers = pg.sprite.Group()  # 十字レーザーのグループ
+    reflective_diffuser_bullets = pg.sprite.Group()  # 反射各散弾のグループ
 
     # 味方関係
     turn_character = pg.Surface((80, 80))
@@ -482,7 +542,7 @@ def main():
     clear_img.blit(txt, txt_rct)  # ゲームクリア画面に描画
 
     tmr = 0
-    clock = pg.time.Clock()    
+    clock = pg.time.Clock()
     while True:
         key_lst = pg.key.get_pressed()  # 押されたkey
         mouse_pos = pg.mouse.get_pos()  # マウスの座標
@@ -548,6 +608,12 @@ def main():
                         # print(r)
                         cross_lasers.add(CrossLaser(r, game.now_character(1).rect.center))
                         game.now_character(1).bump_combo = False
+            # 手番のキャラクターと2のキャラクターとの衝突判定
+            if game.now_character().rect.colliderect(game.now_character(2).rect) and game.now_character(2).bump_combo:
+                if game.turn%4 != 2:
+                    for i in range(10):
+                        reflective_diffuser_bullets.add(ReflectiveDiffuserBullet(game.now_character(2).rect.center))
+                    game.now_character(2).bump_combo = False
             #  手番のキャラクターと3のキャラクターとの衝突判定
             if game.now_character().rect.colliderect(game.now_character(3).rect) and game.now_character(3).bump_combo:
                 if game.turn%4 != 3:
@@ -558,6 +624,8 @@ def main():
         energy_circle_fives.draw(screen)
         cross_lasers.update()
         cross_lasers.draw(screen)
+        reflective_diffuser_bullets.update()
+        reflective_diffuser_bullets.draw(screen)
         high_energy_circles.update()
         high_energy_circles.draw(screen)
 
