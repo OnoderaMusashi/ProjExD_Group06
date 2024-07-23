@@ -59,14 +59,15 @@ class GameManager:
         self.speed = self.characters[self.turn%4].speed  # 動き出す前にスピードを保存する
         self.characters[self.turn%4].dx, self.characters[self.turn%4].dy = 1, 1  # ベクトルを反転させるかを決める変数
                     
-    def update(self, screen, tmr: int):
+    def update(self, screen, tmr: int, f: bool):
         if self.state == "move":
-            self.characters[self.turn%4].update(self.vec)
+            self.characters[self.turn%4].update(self.vec, screen)
             if tmr % 30 == 0:
                 self.characters[self.turn%4].speed -= self.speed - self.speed*DECELERATION_RATE
                 if self.characters[self.turn%4].speed < 1:
                     self.characters[self.turn%4].speed = 0
-                    self.state = "end_process"
+                    if f:
+                        self.state = "end_process"
         self.birds.draw(screen)
         self.img = pg.Surface((WIDTH, 175))
         pg.draw.rect(self.img, (238, 120, 0), (0, 0, WIDTH, 175))
@@ -156,7 +157,6 @@ class Bird(pg.sprite.Sprite):
         self.attack = character_dic[num]["attack"]  # 攻撃力を設定
         self.hp = character_dic[num]["HP"]  # HPを設定
         self.rect = self.image.get_rect()  # rectを取得
-        # self.bump_combo = False #bomp_combo属性を追加
         # キャラクターの初期位置をランダムに設定
         self.x, self.y = random.randint(95+100*num, 105+100*num), random.randint(450, 490)
         self.rect.center = (self.x, self.y)  # キャラクターの位置を設定
@@ -166,21 +166,62 @@ class Bird(pg.sprite.Sprite):
         self.bump_combo_attack = character_dic[num]["combo_attack"]  # 友情コンボのダメージ量を保存
         self.name = character_dic[num]["name"]  # 名前を保存
         self.picture_by = character_dic[num]["picture"]  # 絵の作者
+        self.reflections = pg.sprite.Group()  # 反射した時に現れる図形
     
-    def update(self, v):
+    def update(self, v, screen):
         self.rect.move_ip(self.dx*v[0]*self.speed, self.dy*v[1]*self.speed)  # キャラクター位置を更新
         if 30 > self.rect.centerx:  # 左壁判定
             self.rect.centerx = 30  # キャラクターを壁の中に戻す
             self.dx *= -1  # ベクトルを反転させる
+            self.reflections.add(Reflection((self.rect.left+30, self.rect.centery)))
         if WIDTH-30 < self.rect.centerx:  # 右壁判定
             self.rect.centerx = WIDTH-30
             self.dx *= -1
+            self.reflections.add(Reflection((self.rect.right-30, self.rect.centery)))
         if 30 > self.rect.centery:  # 上壁判定
             self.rect.centery = 30
             self.dy *= -1
+            self.reflections.add(Reflection((self.rect.centerx, self.rect.top+30)))
         if HEIGHT-175-30 < self.rect.centery:  # 下壁判定
             self.rect.centery = HEIGHT-175-30
             self.dy *= -1
+            self.reflections.add(Reflection((self.rect.centerx, self.rect.bottom-30)))
+        self.reflections.update()
+        self.reflections.draw(screen)
+
+
+
+class Reflection(pg.sprite.Sprite):
+    """
+    キャラが壁に反射したときに描画される図形を描くクラス
+    """
+    def __init__(self, pos: tuple[int, int]) -> None:
+        """
+        イニシャライザー
+        引数 pos：キャラの座標タプル
+        """
+        super().__init__()
+        r1_list = []  # 小さい六角形の座標リスト
+        r2_list = []  # 大きい六角形の座標リスト
+        for r in range(30, 391, 60):  # 6角形の座標を生成
+            r1_list.append(rotate_pos((15, 15), 5, r))
+            r2_list.append(rotate_pos((15, 15), 15, r))
+        self.image = pg.Surface((32, 32))  # 壁に反射したときに描画される図形を描くSurface
+        pg.draw.lines(self.image, (0, 0, 255), True, r1_list, 4)  # 小さい六角形
+        pg.draw.lines(self.image, (0, 0, 255), True, r2_list, 4)  # 大きい六角形
+        self.image.set_alpha(100)  # 透明度を設定
+        self.image.set_colorkey((0, 0, 0))  # 黒を透明にする
+        self.rect = self.image.get_rect()
+        self.rect = pos
+        self.life = 5  # 5フレーム描画する
+    
+    def update(self):
+        """
+        lifeが0になったらkillする
+        """
+        self.life -= 1
+        if self.life <= 0:
+            self.kill()
         
 
 class Arrow:
@@ -311,6 +352,11 @@ class Enemy(pg.sprite.Sprite):
         txt_rct.center = self.rect.centery+50, self.rect.centery-60  # 文字の中心を敵右上に設定
         screen.blit(txt, txt_rct)  # 画面に描画
 
+        txt2 = font.render("BOSS", True, (167, 87, 168))  # 文字を作成
+        txt_rct2 = txt2.get_rect()
+        txt_rct2.center = 453, 20  # 文字の中心を敵右上に設定
+        screen.blit(txt2, txt_rct2)  # 画面に描画
+
         # 弱点の生成
         self.weakpoint.fill((0, 0, 0))  # Surfaceを黒で更新
         # 時計回りに回る空色の正三角形
@@ -418,7 +464,7 @@ class HighEnergyCircle(pg.sprite.Sprite):
         if self.time >= 50:
             self.r += 30
             self.t += 3
-        if self.time >= WIDTH+ HEIGHT:
+        if self.r >= WIDTH+ HEIGHT:
             self.kill()
         pg.draw.circle(self.image, (255, 0, 255), self.center, self.r+self.t)
         pg.draw.circle(self.image, (0, 0, 0), self.center, self.r)
@@ -484,7 +530,7 @@ class ReflectiveDiffuserBullet(pg.sprite.Sprite):
             self.dire = [random.randint(-1, 1), random.randint(-1, 1)]
         self.d = 5
         self.rect = self.image.get_rect()
-        self.rect.center = pos
+        self.rect.center = pos[0]+40, pos[1]
         self.attack = 2000  # 友情コンボのダメージ量
         self.life = 3  # 発動時間
 
@@ -619,6 +665,7 @@ def main():
     # 味方関係
     turn_character = pg.Surface((80, 80))
     turn_character_rct = turn_character.get_rect()
+    bump_f = True  # 友情コンボが画面上に存在しない事を確認する変数
     
     # 敵関係
     enemy_list = ["唐揚げ", "手羽先", "ローストチキン"]  # 敵のリスト
@@ -702,6 +749,7 @@ def main():
                     # 味方関係
                     turn_character = pg.Surface((80, 80))
                     turn_character_rct = turn_character.get_rect()
+                    bump_f = True
                     
                     # 敵関係
                     enemy_list = ["唐揚げ", "手羽先", "ローストチキン"]  # 敵のリスト
@@ -809,7 +857,7 @@ def main():
         high_energy_circles.update()
         high_energy_circles.draw(screen)
 
-        game.update(screen, tmr)  # ゲーム進行を更新する
+        game.update(screen, tmr, bump_f)  # ゲーム進行を更新する
         if game.state == "drag":  # 矢印を引っ張ている間
             arrow.draw_(mouse_pos, game.now_character().rect.center, screen)  # 矢印を描画
         
@@ -880,14 +928,28 @@ def main():
                         menu.update(screen)  # キャラ詳細画面を透明化
 
         # 更新処理
+        if len(high_energy_circles) == 0 and len(energy_circle_fives) == 0 and len(cross_lasers) == 0 and len(reflective_diffuser_bullets) == 0:
+            # 友情コンボが画面上に存在しない時
+            bump_f = True
+        else:  # 友情コンボが画面上に存在する時
+            bump_f = False
+        if len(enemys) == 0 and game.now_character().speed > 0 and tmr%5 == 0 and len(enemy_list) == 1:  # 最後の敵を倒したら
+            game.now_character().speed -= 1
         if game.state == "end_process":  # ターンが終了したら
             if len(enemys) == 0:  # 敵のHPが0になったら
                 del enemy_list[0]  # 倒した敵をリストから消す
                 try:
                     enemy = Enemy(enemy_list[0])  # 新たな敵を生成
                     game.hp = game.maxhp 
+                    for chara in birds:
+                        l = math.dist(enemy.rect.center, chara.rect.center)
+                        if l < 90+30:
+                            x = (chara.rect.centerx - enemy.rect.centery)/l*(90+30-l)
+                            y = (chara.rect.centery - enemy.rect.centery)/l*(90+30-l)
+                            chara.rect.move_ip(x, y)
                 except IndexError:  # ゲームクリア
                     screen.blit(clear_img, [0, 0])  # クリア画面を描画
+                    pg.mixer.music.fadeout(1000)
                     pg.display.update()
                     time.sleep(5)
                     return
@@ -911,7 +973,7 @@ def main():
                         clock.tick(60)
                     else:
                         enemy.turn_maxhp = enemy.hp
-            game.update(screen, tmr)
+            game.update(screen, tmr, bump_f)
             game.end_process()  # ターンの最終処理をする
             if game.hp <= 0:
                 screen.blit(go_img, [0, 0])  # ゲームオーバー画面を描画
